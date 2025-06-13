@@ -4,10 +4,10 @@
 
 This repository contains Python code that implements two command-line tools for image denoising:
 
-1.  **RGB Image Denoising (`rgb.py`)**: Denoises standard RGB images (e.g. PNG).
+1.  **RGB Image Denoising (`rgb.py`)**: Denoises standard RGB images (e.g. PNG files).
 2.  **Raw Image Denoising and Processing (`dng.py`)**: Processes digital negative (DNG) raw image files captured on a Raspberry Pi using either `rpicam-still` or Picamera2. The tool provides options for denoising, defective pixel correction, lens shading correction, and more before converting to RGB or saving as a new DNG.
 
-Both tools use TFLite neural network models (via the `ai_edge_litert` library) to perform the denoising.
+Both tools use TFLite neural network models (via the `ai_edge_litert` library) to perform the denoising. There are two versions ("large" and "small") of both the RGB and the Bayer models.
 
 ## Denoising Example
 
@@ -39,6 +39,9 @@ Here's an example of the capabilities of these tools. The original noisy image i
     pip install py3exiv2 tqdm ai-edge-litert
     ```
 
+    On non-Pi devices there probably won't be a `python3-rawpy` apt package, so you will have to omit that
+    and add `rawpy` to the pip install list instead.
+
 ## Quick Start Tutorial
 
 Once you've completed the installation, let's quickly try the tools out to see what they do.
@@ -49,16 +52,22 @@ a noisy RGB image and a noisy DNG file as follows.
 rpicam-still -r -e png -o noisy.png --denoise off --sharpness 0 --gain 12
 ```
 Obsserve that:
-* We're capturing both a DNG and a PNG file. The PNG codec is recommended over JPG for use with the RGB denoise model.
-* Denoise and sharpening are both turned off, as this is recommended for the RGB denoise model too.
+* We're capturing both a DNG and a PNG file. The PNG codec is recommended over JPG for use with the RGB denoise models.
+* Denoise and sharpening are both turned off, as this is recommended for the RGB denoise models too.
 * The gain has been set high so that we have some noise to get rid of!
 
 To denoise the RGB image we can use:
 ```bash
-AI_denoise/rgb.py --input noisy.png --output denoised.jpg
+AI_denoise/rgb.py --input noisy.png --output denoised_small.jpg
 ```
 Be sure to compare the two images!
 
+We included `small` in the output file name because by default it uses the "small" RGB denoising
+model. To denoise using the "large" model, we do the same thing again, changing the output filename and
+specifying the network we want to use.
+```bash
+AI_denoise/rgb.py --input noisy.png --output denoised_large.jpg --network AI_denoise/networks/nafnet_rgb_large.tflite
+```
 Next, we're going to denoise the DNG file. We're going apply _both_ denoise _and_ lens shading correction as calibrated in the camera tuning file, and write out a new DNG. Then we're also going to convert this into
 a finished RGB image for us to inspect. Both the output files - the new DNG and the RGB output - are optional.
 ```bash
@@ -66,13 +75,15 @@ AI_denoise/dng.py --input noisy.dng --denoise on --output-dng denoised_small.dng
 ```
 Again, note that:
 * We have turned denoise on, but LSC (lens shaing correction) is enabled by default.
-* Both output files have been named as "small", because by default the smaller of the two Bayer denoise models is chosen.
+* Both output files have been named as "small", because by default the smaller of the Bayer denoise models is chosen.
 
-Finally, we're going to do the same thing but using the large denoise model. We simply repeat what we did before, changing the output filenames, and specifying the alternative neural network that we wish to use.
+We can switch to the "large" model instead by adding the extra parameter
 ```bash
-AI_denoise/dng.py --input noisy.dng --denoise on --output-dng denoised_large.dng --output-rgb denoised_large.jpg --network AI_denoise/networks/nafnet_bayer_large.tflite
+--network AI_denoise/networks/nafnet_bayer_large.tflite
 ```
-Spend a few moments comparing the three denoised JPG files to each other and to the original noisy image. Also don't forget to look at the two new DNG files (comparing them to the original again) with your favourite raw converter!
+to the command line, just as we did in the RGB case.
+
+Finally, spend a few moments comparing the denoised JPG files to each other and to the original noisy image. Also don't forget to look at the new DNG files (comparing them to the original again) with your favourite raw converter!
 
 ## More on RGB Image Denoising (`rgb.py`)
 
@@ -88,7 +99,7 @@ python3 rgb.py --input <input_image_file> --output <output_image_file> [options]
 
 *   `--input`: (Required) Path to the input RGB image file.
 *   `--output`: (Required) Path to save the denoised RGB image.
-*   `--network`: Path to the TFLite model for RGB denoising. Defaults to `networks/nafnet_rgb.tflite`.
+*   `--network`: Path to the TFLite model for RGB denoising. Defaults to `networks/nafnet_rgb_small.tflite`.
 *   `--overlap <pixels>`: Number of overlap pixels for patch-based processing (default: `16`).
 *   `-y`, `--yes`: Overwrite the output file if it already exists.
 
@@ -158,13 +169,16 @@ To use a more specialised camera tuning file, such as `imx477_scientific.json`, 
 
 ## Networks and Performance
 
-There are currently 3 networks provided.
+There are currently 4 networks provided, two RGB denoise models and two Bayer denoise models. The Bayer models have come out larger than the RGB ones, nonetheless they perform well in terms of execution time because they have only 1/3 the pixel values to process. Also, the small models execute more quickly than the large ones, though not dramaticaly so - execution time is relatively loosely coupled to model size.
 
-1. `nafnet_rgb.tflite` - this is an approximately 7M (million) parameter model which performs high quality denoising of regular RGB images. On a Pi 5 it runs at approximately 12 seconds per megapixel (s/MP).
+| Model          | Type         | Parameters | Performance (s/MP) | Quality         |
+|----------------|--------------|------------|--------------------|-----------------|
+| **RGB Large**  | RGB images   | 1.1M       | 7.9                | Very very high  |
+| **RGB Small**  | RGB images   | 0.5M       | 4.9                | Very high       |
+| **Bayer Large**| Bayer images | 17.7M      | 4.6                | Very very high  |
+| **Bayer Small**| Bayer images | 1.1M       | 2.3                | Very high       |
 
-2. `nafnet_bayer_large.tflite` - this is the larger of the Bayer (raw image) denoise models, with about 17M parameters. But because there are fewer Bayer sample values than in an equivalent resolution RGB image, it actually performs high quality denoising faster than the RGB model, at about 6 s/MP on a Pi 5.
-
-3. `nafnet_bayer_small.tflite` - this is a much smaller model for Bayer image denoising, having only about 1M parameters. It's performance is generally very good, but can be slightly inferior to the other models in some circumstances. It runs at about 3 s/MP (again on a Pi 5).
+Performance numbers are approximate and measured in seconds per megapixel on a Pi 5.
 
 Some other general points to note:
 

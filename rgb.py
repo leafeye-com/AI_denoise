@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     Type "python rgb.py --help" for more options.
     """
-    default_network_path = str(Path(__file__).resolve().parent / "networks" / "nafnet_rgb.tflite")
+    default_network_path = str(Path(__file__).resolve().parent / "networks" / "nafnet_rgb_small.tflite")
 
     parser = argparse.ArgumentParser(description="Denoise an RGB image.")
     parser.add_argument("--input", required=True, help="Input RGB image filename.")

@@ -71,7 +71,7 @@ class Network:
         return stride, num_patches_w, num_patches_h, width_padded, height_padded
 
     def _split_into_patches(self, image: np.ndarray,
-                            patch_info: tuple[int, int, int, int, int]) -> np.ndarray:
+                            patch_info: tuple[int, int, int, int, int]) -> list[np.ndarray]:
         """
         Split an image into overlapping patch_size x patch_size patches with reflection padding.
 
@@ -110,7 +110,7 @@ class Network:
                 patch = img_padded[h_start:h_start + self.patch_size, w_start:w_start + self.patch_size]
                 patches.append(patch)
 
-        return np.array(patches)
+        return patches
 
     def _reassemble_patches(
             self,
