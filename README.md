@@ -7,7 +7,7 @@ This repository contains Python code that implements two command-line tools for 
 1.  **RGB Image Denoising (`rgb.py`)**: Denoises standard RGB images (e.g. PNG files).
 2.  **Raw Image Denoising and Processing (`dng.py`)**: Processes digital negative (DNG) raw image files captured on a Raspberry Pi using either `rpicam-still` or Picamera2. The tool provides options for denoising, defective pixel correction, lens shading correction, and more before converting to RGB or saving as a new DNG.
 
-Both tools use TFLite neural network models (via the `ai_edge_litert` library) to perform the denoising. There are two versions ("large" and "small") of both the RGB and the Bayer models.
+Both tools use TFLite neural network models (via the `ai_edge_litert` library) to perform the denoising. There are a number of versions of both the RGB and the Bayer models, giving a choice of different model sizes, output quality and execution speed.
 
 ## Denoising Example
 
@@ -169,14 +169,20 @@ To use a more specialised camera tuning file, such as `imx477_scientific.json`, 
 
 ## Networks and Performance
 
-There are currently 4 networks provided, two RGB denoise models and two Bayer denoise models. The Bayer models have come out larger than the RGB ones, nonetheless they perform well in terms of execution time because they have only 1/3 the pixel values to process. Also, the small models execute more quickly than the large ones, though not dramaticaly so - execution time is relatively loosely coupled to model size.
+There are currently 6 networks provided, three RGB denoise models and three Bayer denoise models. They can be found in the project's `networks` folder.
 
-| Model          | Type         | Parameters | Performance (s/MP) | Quality         |
-|----------------|--------------|------------|--------------------|-----------------|
-| **RGB Large**  | RGB images   | 1.1M       | 7.9                | Very very high  |
-| **RGB Small**  | RGB images   | 0.5M       | 4.9                | Very high       |
-| **Bayer Large**| Bayer images | 17.7M      | 4.6                | Very very high  |
-| **Bayer Small**| Bayer images | 1.1M       | 2.3                | Very high       |
+The Bayer models have come out larger than the RGB ones, nonetheless they perform well in terms of execution time because they have only 1/3 the pixel values to process. The models come from two different families, [NAFNet](https://arxiv.org/pdf/2204.04676v4), and there are some simpler [Unet](https://arxiv.org/pdf/1505.04597)-derived models too.
+
+Generally, smaller models run faster than larger models, though the relationship between speed and model size is not straightforward. Also, the Unet models are simpler and run faster than the NAFNet ones.
+
+| Model          |Name                         | Use Case     | Family | Parameters | Performance (s/MP) | Quality         |
+|----------------|-----------------------------|--------------|--------|------------|--------------------|-----------------|
+| **RGB Large**  | `nafnet_rgb_large.tflite`   | RGB images   | NAFNet | 1.1M       | 8.0                | Very very high  |
+| **RGB Small**  | `nafnet_rgb_small.tflite`   | RGB images   | NAFNet | 0.5M       | 4.9                | Very high       |
+| **RGB Fast**   | `unet_rgb_fast.tflite`      | RGB images   | Unet   | 0.2M       | 2.1                | High            |
+| **Bayer Large**| `nafnet_bayer_large.tflite` | Bayer images | NAFNet | 17.7M      | 4.7                | Very very high  |
+| **Bayer Small**| `nafnet_bayer_small.tflite` | Bayer images | NAFNet | 1.1M       | 2.3                | Very high       |
+| **Bayer Fast** | `unet_bayer_fast.tflite`    | Bayer images | Unet   | 0.5M       | 1.3                | High            |
 
 Performance numbers are approximate and measured in seconds per megapixel on a Pi 5.
 
@@ -184,7 +190,6 @@ Some other general points to note:
 
 * The models are trained on Raspberry Pi camera images taken at full resolution. In all other cases, results may vary.
 * After denoising, the models tend to be a little soft and will benefit from some sympathetic sharpening.
-* All models are based on [NAFNet](https://arxiv.org/pdf/2204.04676v4).
 
 ## License
 
